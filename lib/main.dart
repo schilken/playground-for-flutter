@@ -13,11 +13,12 @@ void main() {
   Account account = Account(client);
   Storage storage = Storage(client);
   Databases databases = Databases(client);
+  Functions functions = Functions(client);
 
   client
           .setEndpoint(
-              'https://localhost/v1') // Make sure your endpoint is accessible from your emulator, use IP if needed
-          .setProject('[YOUR PROJECT ID]') // Your project ID
+              'https://192.168.2.23/v1') // Make sure your endpoint is accessible from your emulator, use IP if needed
+          .setProject('playgroundForFlutter') // Your project ID
           .setSelfSigned() // Do not use this in production
       ;
 
@@ -27,6 +28,7 @@ void main() {
       account: account,
       storage: storage,
       database: databases,
+      functions: functions,
     ),
   ));
 }
@@ -36,11 +38,14 @@ class Playground extends StatefulWidget {
       {required this.client,
       required this.account,
       required this.storage,
-      required this.database});
+    required this.database,
+    required this.functions,
+  });
   final Client client;
   final Account account;
   final Storage storage;
   final Databases database;
+  final Functions functions;
 
   @override
   PlaygroundState createState() => PlaygroundState();
@@ -63,13 +68,13 @@ class PlaygroundState extends State<Playground> {
   _getAccount() async {
     try {
       user = await widget.account.get();
-      if (user!.email.isEmpty) {
+      setState(() {
+        if (user!.email.isEmpty) {
         username = "Anonymous Login";
       } else {
         username = user!.name;
       }
-      user = user;
-      setState(() {});
+      });
     } on AppwriteException catch (error) {
       print(error.message);
       setState(() {
@@ -116,6 +121,17 @@ class PlaygroundState extends State<Playground> {
       print(e.message);
     } catch (e) {
       print(e);
+    }
+  }
+
+_callRemoteFunction() async {
+    try {
+      final execution = await widget.functions
+          .createExecution(functionId: 'func01', data: "arg1:string-argument");
+      print('execution.status: ${execution.status}');
+      print('execution.response: ${execution.response}');
+    } on AppwriteException catch (e) {
+      print(e.message);
     }
   }
 
@@ -191,7 +207,9 @@ class PlaygroundState extends State<Playground> {
                       print(e.message);
                     }
                   }),
-              Padding(padding: EdgeInsets.all(20.0)),
+              Padding(
+                padding: const EdgeInsets.all(20.0),
+              ),
               ElevatedButton(
                 child: Text(
                   subscription != null ? "Unsubscribe" : "Subscribe",
@@ -222,14 +240,14 @@ class PlaygroundState extends State<Playground> {
                   onPressed: () async {
                     try {
                       final document = await widget.database.createDocument(
-                        databaseId: ID.custom('default'),
+                        databaseId: 'db1', // ID.custom('default'),
                         collectionId:
-                            ID.custom('usernames'), //change your collection id
+                            'c1', //change your collection id
                         documentId: ID.unique(),
-                        data: {'username': 'hello2'},
+                        data: {'message': 'a message', 'justANumber': 42},
                         permissions: [
                           Permission.read(Role.any()),
-                          Permission.write(Role.any()),
+                          Permission.write(Role.user(user?.$id ?? 'none')),
                         ],
                       );
                       print(document.toMap());
@@ -250,6 +268,20 @@ class PlaygroundState extends State<Playground> {
                   ),
                   onPressed: () {
                     _uploadFile();
+                  }),
+              const SizedBox(height: 10.0),
+              ElevatedButton(
+                  child: Text(
+                    "Call function",
+                    style: TextStyle(color: Colors.white, fontSize: 20.0),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    primary: Colors.blue,
+                    padding: const EdgeInsets.all(16),
+                    minimumSize: Size(280, 50),
+                  ),
+                  onPressed: () {
+                    _callRemoteFunction();
                   }),
               Padding(padding: EdgeInsets.all(20.0)),
               ElevatedButton(
